@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="School Day">
+<title>Today's School Day</title>
+<style>
+  :root {
+    --purple: #5B2C8C;
+    --gold: #F5A623;
+    --light-bg: #f8f6fb;
+    --card-bg: #ffffff;
+    --text: #2d2d2d;
+    --text-light: #666;
+    --rain-blue: #4A90D9;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--light-bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+    padding-top: env(safe-area-inset-top, 16px);
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .date {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--purple);
+  }
+
+  .program-day {
+    display: inline-block;
+    margin-top: 8px;
+    background: var(--purple);
+    color: white;
+    font-size: 1.3rem;
+    font-weight: 700;
+    padding: 8px 24px;
+    border-radius: 50px;
+  }
+
+  .program-day.no-school {
+    background: var(--gold);
+    color: var(--text);
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--purple);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .icon {
+    font-size: 1.3rem;
+  }
+
+  /* Weather styles */
+  .weather-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .weather-time {
+    text-align: center;
+    padding: 12px 8px;
+    background: var(--light-bg);
+    border-radius: 12px;
+  }
+
+  .weather-time .time-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--purple);
+    margin-bottom: 6px;
+  }
+
+  .weather-time .temp {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .weather-time .feels-like {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  .rain-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #eef4fb;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  .rain-info .rain-icon {
+    font-size: 1.2rem;
+  }
+
+  .rain-chance-high {
+    color: var(--rain-blue);
+    font-weight: 600;
+  }
+
+  /* Lunch styles */
+  .lunch-section {
+    margin-bottom: 12px;
+  }
+
+  .lunch-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .lunch-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .lunch-item {
+    font-size: 1rem;
+    padding: 3px 0;
+    color: var(--text);
+  }
+
+  .lunch-item.entree {
+    font-weight: 600;
+  }
+
+  .lunch-note {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+  }
+
+  .loading {
+    color: var(--text-light);
+    font-style: italic;
+    padding: 8px 0;
+  }
+
+  .error {
+    color: #c0392b;
+    font-size: 0.9rem;
+    padding: 8px 0;
+  }
+
+  .refresh-btn {
+    display: block;
+    margin: 20px auto 0;
+    padding: 10px 28px;
+    background: var(--purple);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .refresh-btn:active {
+    opacity: 0.8;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 0.75rem;
+    color: var(--text-light);
+  }
+
+  /* Day cycle dots */
+  .day-cycle {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .day-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: #e8e0f0;
+    color: var(--purple);
+  }
+
+  .day-dot.active {
+    background: var(--gold);
+    color: white;
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(245,166,35,0.4);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="date" id="todayDate">Loading...</div>
+  <div class="program-day" id="programDay">...</div>
+  <div class="day-cycle" id="dayCycle"></div>
+</div>
+
+<div class="card" id="weatherCard">
+  <div class="card-title"><span class="icon">🌤️</span> Weather — Johnston, IA</div>
+  <div class="weather-grid" id="weatherGrid">
+    <div class="weather-time">
+      <div class="time-label">8 AM</div>
+      <div class="temp loading" id="temp8">--°</div>
+      <div class="feels-like" id="feels8">Feels --°</div>
+    </div>
+    <div class="weather-time">
+      <div class="time-label">12 PM</div>
+      <div class="temp loading" id="temp12">--°</div>
+      <div class="feels-like" id="feels12">Feels --°</div>
+    </div>
+    <div class="weather-time">
+      <div class="time-label">4 PM</div>
+      <div class="temp loading" id="temp16">--°</div>
+      <div class="feels-like" id="feels16">Feels --°</div>
+    </div>
+  </div>
+  <div class="rain-info" id="rainInfo">
+    <span class="rain-icon">🌧️</span>
+    <span id="rainText" class="loading">Checking rain forecast...</span>
+  </div>
+</div>
+
+<div class="card" id="lunchCard">
+  <div class="card-title"><span class="icon">🍽️</span> School Lunch</div>
+  <div id="lunchMenu">
+    <div class="loading">Loading lunch menu...</div>
+  </div>
+</div>
+
+<button class="refresh-btn" onclick="loadAll()">Refresh</button>
+
+<div class="footer">
+  Wallace Elementary — Johnston CSD<br>
+  <span id="lastUpdated"></span>
+</div>
+
+<script>
+// ============================
+// NO-SCHOOL DAYS (2025-2026)
+// ============================
+const NO_SCHOOL_DAYS = new Set([
+  // Before school starts
+  // First day of school: Aug 25, 2025
+  '2025-09-01', // Labor Day
+  '2025-09-29', // Staff PD
+  '2025-10-13', // Fall Break / Columbus Day
+  '2025-11-14', // P/T Comp Day
+  '2025-11-26', // Thanksgiving Break
+  '2025-11-27',
+  '2025-11-28',
+  '2025-12-22', // Winter Break
+  '2025-12-23',
+  '2025-12-24',
+  '2025-12-25',
+  '2025-12-26',
+  '2025-12-29',
+  '2025-12-30',
+  '2025-12-31',
+  '2026-01-01', // Winter Break cont.
+  '2026-01-02', // Staff PD
+  '2026-01-19', // MLK Jr Day
+  '2026-02-02', // Staff PD
+  '2026-02-16', // Presidents Day / Staff PD
+  '2026-03-13', // P/T Comp Day
+  '2026-03-16', // Spring Break
+  '2026-03-17',
+  '2026-03-18',
+  '2026-03-19',
+  '2026-03-20',
+  '2026-04-23', // Staff PD
+  '2026-04-24', // Break Day
+  '2026-05-25', // Memorial Day
+]);
+
+const SCHOOL_YEAR_START = new Date(2025, 7, 25); // Aug 25, 2025
+const SCHOOL_YEAR_END   = new Date(2026, 4, 29); // May 29, 2026
+
+// Anchor: April 6, 2026 = Day 5
+const ANCHOR_DATE = new Date(2026, 3, 6);
+const ANCHOR_DAY  = 5;
+
+// ============================
+// DATE HELPERS
+// ============================
+function toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isWeekday(d) {
+  const dow = d.getDay();
+  return dow !== 0 && dow !== 6;
+}
+
+function isSchoolDay(d) {
+  if (!isWeekday(d)) return false;
+  if (NO_SCHOOL_DAYS.has(toDateStr(d))) return false;
+  if (d < SCHOOL_YEAR_START || d > SCHOOL_YEAR_END) return false;
+  return true;
+}
+
+// ============================
+// PROGRAM DAY CALCULATION
+// ============================
+function getProgramDay(targetDate) {
+  const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const anchor = new Date(ANCHOR_DATE);
+
+  if (!isSchoolDay(target)) return null;
+
+  let schoolDayDiff = 0;
+  if (target >= anchor) {
+    let d = new Date(anchor);
+    d.setDate(d.getDate() + 1);
+    while (d <= target) {
+      if (isSchoolDay(d)) schoolDayDiff++;
+      d.setDate(d.getDate() + 1);
+    }
+  } else {
+    let d = new Date(target);
+    d.setDate(d.getDate() + 1);
+    while (d <= anchor) {
+      if (isSchoolDay(d)) schoolDayDiff++;
+      d.setDate(d.getDate() + 1);
+    }
+    schoolDayDiff = -schoolDayDiff;
+  }
+
+  // anchorDay is 5 (1-indexed), so offset = anchorDay - 1 = 4
+  let dayNum = ((ANCHOR_DAY - 1 + schoolDayDiff) % 6 + 6) % 6 + 1;
+  return dayNum;
+}
+
+// ============================
+// FORMAT DATE
+// ============================
+function formatDate(d) {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const nth = (n) => {
+    if (n > 3 && n < 21) return 'th';
+    switch (n % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
+  };
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}${nth(d.getDate())}`;
+}
+
+// ============================
+// DISPLAY DATE & PROGRAM DAY
+// ============================
+function displayDateAndDay() {
+  const today = new Date();
+  document.getElementById('todayDate').textContent = formatDate(today);
+
+  const dayNum = getProgramDay(today);
+  const pdEl = document.getElementById('programDay');
+  const cycleEl = document.getElementById('dayCycle');
+
+  if (dayNum === null) {
+    // Check if it's a weekend or no-school day
+    if (!isWeekday(today)) {
+      pdEl.textContent = 'Weekend!';
+      pdEl.className = 'program-day no-school';
+      // Show what the NEXT school day will be
+      showNextSchoolDay(cycleEl, today);
+    } else if (today < SCHOOL_YEAR_START || today > SCHOOL_YEAR_END) {
+      pdEl.textContent = 'No School';
+      pdEl.className = 'program-day no-school';
+      cycleEl.innerHTML = '';
+    } else {
+      pdEl.textContent = 'No School Today';
+      pdEl.className = 'program-day no-school';
+      showNextSchoolDay(cycleEl, today);
+    }
+  } else {
+    pdEl.textContent = `Day ${dayNum}`;
+    pdEl.className = 'program-day';
+
+    // Render 6 dots
+    let html = '';
+    for (let i = 1; i <= 6; i++) {
+      html += `<div class="day-dot ${i === dayNum ? 'active' : ''}">${i}</div>`;
+    }
+    cycleEl.innerHTML = html;
+  }
+}
+
+function showNextSchoolDay(el, fromDate) {
+  let d = new Date(fromDate);
+  for (let i = 0; i < 30; i++) {
+    d.setDate(d.getDate() + 1);
+    if (isSchoolDay(d)) {
+      const nextDay = getProgramDay(d);
+      el.innerHTML = `<span style="font-size:0.85rem;color:var(--text-light);">Next school day: ${formatDate(d)} — Day ${nextDay}</span>`;
+      return;
+    }
+  }
+  el.innerHTML = '';
+}
+
+// ============================
+// WEATHER (Open-Meteo — free, no key needed)
+// ============================
+
+// Helper: fetch JSON with CORS-proxy fallback (needed for file:// context)
+async function fetchJSON(url) {
+  try {
+    const res = await fetch(url);
+    if (res.ok) return await res.json();
+    throw new Error('status ' + res.status);
+  } catch (e) {
+    const res = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(url));
+    if (!res.ok) throw new Error('proxy failed');
+    return await res.json();
+  }
+}
+
+async function loadWeather() {
+  const lat = 41.6731;
+  const lon = -93.7196;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation&temperature_unit=fahrenheit&timezone=America/Chicago&forecast_days=2`;
+
+  try {
+    const data = await fetchJSON(url);
+
+    const today = new Date();
+    const todayStr = toDateStr(today);
+
+    const hours = data.hourly.time;
+    const temps = data.hourly.temperature_2m;
+    const feelsLike = data.hourly.apparent_temperature;
+    const rainProb = data.hourly.precipitation_probability;
+    const precip = data.hourly.precipitation;
+
+    // Find indices for 8am, 12pm, 4pm today
+    const targetHours = [8, 12, 16];
+    const ids = ['8', '12', '16'];
+
+    targetHours.forEach((h, i) => {
+      const timeStr = `${todayStr}T${String(h).padStart(2,'0')}:00`;
+      const idx = hours.indexOf(timeStr);
+      if (idx !== -1) {
+        const t = Math.round(temps[idx]);
+        const f = Math.round(feelsLike[idx]);
+        document.getElementById(`temp${ids[i]}`).textContent = `${t}°`;
+        document.getElementById(`temp${ids[i]}`).classList.remove('loading');
+        document.getElementById(`feels${ids[i]}`).textContent = `Feels ${f}°`;
+      }
+    });
+
+    // Rain analysis: find max rain chance and first rain hour today (6am-10pm)
+    let maxRain = 0;
+    let firstRainHour = null;
+    for (let h = 6; h <= 22; h++) {
+      const timeStr = `${todayStr}T${String(h).padStart(2,'0')}:00`;
+      const idx = hours.indexOf(timeStr);
+      if (idx !== -1) {
+        if (rainProb[idx] > maxRain) maxRain = rainProb[idx];
+        if (rainProb[idx] >= 30 && firstRainHour === null) {
+          firstRainHour = h;
+        }
+      }
+    }
+
+    const rainEl = document.getElementById('rainText');
+    if (maxRain < 10) {
+      rainEl.textContent = `${maxRain}% chance of rain — Looking dry today!`;
+      rainEl.classList.remove('loading');
+    } else if (firstRainHour !== null) {
+      const ampm = firstRainHour >= 12 ? 'pm' : 'am';
+      const hr12 = firstRainHour > 12 ? firstRainHour - 12 : firstRainHour;
+      rainEl.innerHTML = `<span class="rain-chance-high">${maxRain}% chance of rain</span> — possible starting around ${hr12}${ampm}`;
+      rainEl.classList.remove('loading');
+    } else {
+      rainEl.textContent = `${maxRain}% chance of rain today`;
+      rainEl.classList.remove('loading');
+    }
+
+  } catch (err) {
+    document.getElementById('rainText').textContent = 'Could not load weather data';
+    document.getElementById('rainText').classList.remove('loading');
+    document.getElementById('rainText').classList.add('error');
+    console.error('Weather error:', err);
+  }
+}
+
+// ============================
+// LUNCH DATABASE (pre-loaded, no API needed)
+// Scraped from Nutrislice Apr 6 – May 29, 2026
+// m = main entree  |  s = sides & other options
+// ============================
+const LUNCH_DB = {
+  "2026-04-06": {m:"Breaded Chicken Patty on a WG Bun", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Mixed Vegetables, Italian Vegetables, Baby Carrots, Apricots, Craisins"},
+  "2026-04-07": {m:"Beef Taco Meat + Tortilla + Shredded Cheese", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Refried Beans, Lettuce, Salsa, Mandarin Oranges, Fresh Apple Slices"},
+  "2026-04-08": {m:"Beacon St. Cheesy Bread Sticks + Marinara", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Dinner Roll, Steamed Carrots, Fresh Broccoli, Pears, Fresh Strawberries"},
+  "2026-04-09": {m:"Chicken Corn Dog", s:"Yogurt Yolite, Rockin'ola Granola, French Fries, Romaine Lettuce Salad, Kiwi, Peaches, Scooby Grahams"},
+  "2026-04-10": {m:"Stuffed Crust Cheese Pizza", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Mixed Vegetables, Peas & Carrots, Baby Carrots, Strawberry Applesauce Cup, Orange Wedges"},
+  "2026-04-13": {m:"Cheese Burger on a Bun + Sliced Pickles", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Green Beans, Fresh Spinach Salad, Peaches, Raisins"},
+  "2026-04-14": {m:"Chicken Nuggets", s:"Yogurt Yolite, Rockin'ola Granola, Black Beans, Red Pepper Strips, Mixed Fruit, Fresh Apple Slices, Chocolate Chip Cookie"},
+  "2026-04-15": {m:"Pull-Aparts Italian Cheese & Garlic", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Dinner Roll, Mixed Vegetables, Broccoli Normandy, Baby Carrots, Cinnamon Applesauce Cup, Clementine"},
+  "2026-04-16": {m:"Snack N Waffles Buttery Maple + Syrup + Turkey Sausage Patty", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Potato Smiles, Romaine Lettuce Salad, Blueberries, Strawberries"},
+  "2026-04-17": {m:"Macaroni & Cheese", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Peas, Baby Carrots, Pears, Grapes"},
+  "2026-04-20": {m:"Hot Dog (Turkey) on a Bun", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Baked Beans, Baby Carrots, Pineapple, Peach Applesauce Cup"},
+  "2026-04-21": {m:"Chicken Alfredo Pasta", s:"Yogurt Yolite, Rockin'ola Granola, Steamed Broccoli, Cherry Tomatoes, Variety Fresh Fruit, Apricots, Garlic Toast"},
+  "2026-04-22": {m:"Chicken Popcorn", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Mixed Vegetables, Italian Vegetables, Baby Carrots, Peaches, Fresh Apple Slices, Wacky Cake"},
+  "2026-04-27": {m:"Chicken Strips", s:"Yogurt Yolite, Rockin'ola Granola, Corn, Fresh Spinach Salad, Peaches, Apple Juice Cup, Educational Cookies"},
+  "2026-04-28": {m:"French Toast Sticks + Egg, Hard Boiled + Syrup", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Hash Brown Wedge, Baby Carrots, Fresh Apple Slices, Strawberries"},
+  "2026-04-29": {m:"Hamburger on a Bun + Sliced Pickles", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Baked Beans, Cucumber Slices, Pears, Variety Fresh Fruit"},
+  "2026-04-30": {m:"Mandarin Orange Chicken + Brown Rice", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Mixed Vegetables, Stir Fry Vegetables, Romaine Lettuce Salad, Pineapple, Banana"},
+  "2026-05-01": {m:"Cheesy Dragon Bread", s:"Yogurt Yolite, Rockin'ola Granola, Green Beans, Celery Sticks, Mixed Fruit, Fresh Pear, Star Cookie WG"},
+  "2026-05-04": {m:"Breaded Chicken Patty on a WG Bun", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Mixed Vegetables, Italian Vegetables, Baby Carrots, Apricots, Craisins"},
+  "2026-05-05": {m:"Nacho Cheese Doritos + Beef Taco Meat + Shredded Cheese", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Refried Beans, Shredded Lettuce, Salsa, Mandarin Oranges, Fresh Apple Slices"},
+  "2026-05-06": {m:"Beacon St. Cheesy Bread Sticks + Marinara", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Dinner Roll, Steamed Carrots, Fresh Broccoli, Pears, Variety Fresh Fruit"},
+  "2026-05-07": {m:"Chicken Corn Dog", s:"Yogurt Yolite, Rockin'ola Granola, French Fries, Romaine Lettuce Salad, Kiwi, Peaches, Scooby Grahams"},
+  "2026-05-08": {m:"Pepperoni Turkey Pizza Wedge", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Mixed Vegetables, Peas & Carrots, Baby Carrots, Applesauce, Orange Wedges"},
+  "2026-05-11": {m:"Cheese Burger on a Bun + Sliced Pickles", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Green Beans, Fresh Spinach Salad, Peaches, Raisins"},
+  "2026-05-12": {m:"Chicken Nuggets", s:"Yogurt Yolite, Rockin'ola Granola, Black Beans, Red Pepper Strips, Mixed Fruit, Fresh Apple Slices, Chocolate Chip Cookie"},
+  "2026-05-13": {m:"Cheese & Bean Burrito", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Dinner Roll, Mixed Vegetables, Broccoli Normandy, Baby Carrots, Cinnamon Applesauce Cup, Variety Fresh Fruit"},
+  "2026-05-14": {m:"Snack N Waffles Buttery Maple + Syrup + Turkey Sausage Patty", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Potato Smiles, Romaine Lettuce Salad, Blueberries, Strawberries"},
+  "2026-05-15": {m:"Macaroni & Cheese", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Snap Peas, Baby Carrots, Pears, Grapes"},
+  "2026-05-18": {m:"Hot Dog (Turkey) on a Bun", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Baked Beans, Baby Carrots, Pineapple, Peach Applesauce Cup"},
+  "2026-05-19": {m:"Chicken Alfredo Pasta", s:"Yogurt Yolite, Rockin'ola Granola, Mixed Vegetables, Italian Vegetables, Fresh Broccoli, Apricots, Variety Fresh Fruit, Garlic Toast"},
+  "2026-05-20": {m:"Chicken Popcorn", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Green Beans, Baby Carrots, Peaches, Fresh Apple Slices, Churro Crackers"},
+  "2026-05-21": {m:"Beef Fiestada Pizza", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Peas, Cherry Tomatoes, Pears, Frozen Strawberry-Pomegranate Cup"},
+  "2026-05-22": {m:"Cheese Filled Bosco Sticks + Marinara", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Steamed Cauliflower, Celery Sticks, Sun Butter Cup, Mandarin Oranges, Banana"},
+  "2026-05-26": {m:"Chicken Strips", s:"Yogurt Yolite, Rockin'ola Granola, Baked Beans, Fresh Broccoli, Peaches, Strawberry Applesauce Cup, Educational Cookies"},
+  "2026-05-27": {m:"French Toast Sticks + Syrup + Egg, Hard Boiled", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Hash Brown Wedge, Baby Carrots, Fresh Apple Slices, Strawberries"},
+  "2026-05-28": {m:"Garlic French Bread Pizza", s:"Yogurt Yolite, Rockin'ola Granola, Dinner Roll, Green Beans, Celery Sticks, Pineapple, Banana"},
+  "2026-05-29": {m:"Sunbutter & Grape Jelly Uncrustable", s:"Yogurt Yolite, Rockin'ola Granola, Mozzarella Cheese Stick, Baby Carrots, Cherry Tomatoes, Apple, Juicy Juice Box, ChatSnax Vanilla Crunch"}
+};
+
+function loadLunch() {
+  const todayStr = toDateStr(new Date());
+  const menuEl = document.getElementById('lunchMenu');
+  const entry = LUNCH_DB[todayStr];
+
+  if (!entry) {
+    menuEl.innerHTML = '<div class="loading">No lunch data for today. <a href="https://johnston.nutrislice.com/menu/wallace-elementary/lunch" target="_blank" style="color:var(--purple)">View on Nutrislice</a></div>';
+    return;
+  }
+
+  let html = '';
+  html += `<div class="lunch-section">`;
+  html += `<div class="lunch-section-title">Main Entree</div>`;
+  html += `<div class="lunch-item entree">${entry.m}</div>`;
+  html += `</div>`;
+
+  if (entry.s) {
+    // Filter out the yogurt meal alternative (always available, not a daily side)
+    // Yogurt meal package = Yogurt Yolite + Rockin'ola Granola + Dinner Roll
+    const sides = entry.s.split(', ').filter(s =>
+      !s.toLowerCase().includes('yogurt') &&
+      !s.toLowerCase().includes('rockin\'ola granola') &&
+      !s.toLowerCase().includes('dinner roll')
+    );
+    if (sides.length > 0) {
+      html += `<div class="lunch-section">`;
+      html += `<div class="lunch-section-title">Sides &amp; More</div>`;
+      for (const side of sides) {
+        html += `<div class="lunch-item">${side}</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+
+  html += `<div class="lunch-note">🍎 Variety fruit &amp; juice offered &nbsp;|&nbsp; 🥛 Milk included</div>`;
+  menuEl.innerHTML = html;
+}
+
+// ============================
+// LOAD EVERYTHING
+// ============================
+function loadAll() {
+  displayDateAndDay();
+  loadWeather();
+  loadLunch();
+  document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'})}`;
+}
+
+// Start on page load
+loadAll();
+</script>
+
+</body>
+</html>

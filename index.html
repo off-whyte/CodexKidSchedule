@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="School Day">
 <title>Today's School Day</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --purple: #5B2C8C;
@@ -275,6 +276,89 @@
     transform: scale(1.15);
     box-shadow: 0 2px 6px rgba(245,166,35,0.4);
   }
+
+  /* Google Calendar styles */
+  .cal-event {
+    padding: 10px 12px;
+    background: var(--light-bg);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .cal-event:last-of-type {
+    margin-bottom: 0;
+  }
+
+  .cal-event-time {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--purple);
+    margin-bottom: 2px;
+  }
+
+  .cal-event-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .cal-event-loc {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  .cal-empty {
+    color: var(--text-light);
+    font-style: italic;
+    padding: 4px 0;
+  }
+
+  .cal-footer {
+    margin-top: 12px;
+    text-align: right;
+  }
+
+  .gcal-signin-btn {
+    display: block;
+    background: white;
+    color: var(--text);
+    border: 1px solid #ddd;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    margin: 4px auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .gcal-signin-btn:active { opacity: 0.8; }
+
+  .gcal-signout-btn {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  .cal-setup {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    line-height: 1.5;
+  }
+
+  .cal-setup code {
+    background: #ede8f5;
+    color: var(--purple);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+  }
 </style>
 </head>
 <body>
@@ -319,6 +403,13 @@
   <div class="card-title"><span class="icon">🍽️</span> School Lunch</div>
   <div id="lunchMenu">
     <div class="loading">Loading lunch menu...</div>
+  </div>
+</div>
+
+<div class="card" id="calendarCard">
+  <div class="card-title"><span class="icon">📅</span> Evening Events</div>
+  <div id="calendarContent">
+    <div class="loading">Loading…</div>
   </div>
 </div>
 
@@ -688,12 +779,162 @@ function loadLunch() {
 }
 
 // ============================
+// GOOGLE CALENDAR INTEGRATION
+// ============================
+// Setup steps:
+//  1. Go to https://console.cloud.google.com/
+//  2. Create a project, enable "Google Calendar API"
+//  3. Create OAuth 2.0 credentials (Web application type)
+//  4. Add your app's URL to "Authorized JavaScript origins"
+//  5. Paste your Client ID below (replace the placeholder)
+const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
+
+let gcalToken = null;
+let gcalTokenExpiry = 0;
+
+function isGCalConfigured() {
+  return GOOGLE_CLIENT_ID !== 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com' && GOOGLE_CLIENT_ID.trim() !== '';
+}
+
+function loadGCalSection() {
+  if (!isGCalConfigured()) {
+    document.getElementById('calendarContent').innerHTML =
+      '<div class="cal-setup">To show your Google Calendar events, set the ' +
+      '<code>GOOGLE_CLIENT_ID</code> variable in this file. ' +
+      '<a href="https://console.cloud.google.com/" target="_blank" style="color:var(--purple)">Get one at console.cloud.google.com</a></div>';
+    return;
+  }
+
+  // Restore stored token if still valid
+  const stored = localStorage.getItem('gcal_token');
+  const expiry = parseInt(localStorage.getItem('gcal_expiry') || '0');
+  if (stored && Date.now() < expiry) {
+    gcalToken = stored;
+    gcalTokenExpiry = expiry;
+    fetchCalendarEvents();
+  } else {
+    gcalToken = null;
+    renderGCalSignIn();
+  }
+}
+
+function renderGCalSignIn() {
+  document.getElementById('calendarContent').innerHTML =
+    '<button class="gcal-signin-btn" onclick="signInGoogle()">🔑 Sign in with Google</button>';
+}
+
+function signInGoogle() {
+  if (typeof google === 'undefined') {
+    document.getElementById('calendarContent').innerHTML =
+      '<div class="error">Google Sign-In script not loaded. Check your internet connection.</div>';
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    callback(resp) {
+      if (resp.error) {
+        document.getElementById('calendarContent').innerHTML =
+          `<div class="error">Sign-in failed: ${resp.error}</div>`;
+        return;
+      }
+      gcalToken = resp.access_token;
+      gcalTokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+      localStorage.setItem('gcal_token', gcalToken);
+      localStorage.setItem('gcal_expiry', String(gcalTokenExpiry));
+      fetchCalendarEvents();
+    },
+  });
+  client.requestAccessToken();
+}
+
+function signOutGoogle() {
+  gcalToken = null;
+  gcalTokenExpiry = 0;
+  localStorage.removeItem('gcal_token');
+  localStorage.removeItem('gcal_expiry');
+  renderGCalSignIn();
+}
+
+async function fetchCalendarEvents() {
+  const calEl = document.getElementById('calendarContent');
+  calEl.innerHTML = '<div class="loading">Loading events…</div>';
+
+  const dateStr = toDateStr(selectedDate);
+  // 4 PM local time on the selected date
+  const timeMin = new Date(`${dateStr}T16:00:00`).toISOString();
+  const timeMax = new Date(`${dateStr}T23:59:59`).toISOString();
+
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?' +
+    `timeMin=${encodeURIComponent(timeMin)}` +
+    `&timeMax=${encodeURIComponent(timeMax)}` +
+    `&singleEvents=true&orderBy=startTime&maxResults=20`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${gcalToken}` }
+    });
+    if (res.status === 401) {
+      gcalToken = null;
+      localStorage.removeItem('gcal_token');
+      localStorage.removeItem('gcal_expiry');
+      renderGCalSignIn();
+      return;
+    }
+    if (!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    renderCalEvents(data.items || []);
+  } catch (err) {
+    calEl.innerHTML = '<div class="error">Could not load calendar events</div>';
+    console.error('Calendar error:', err);
+  }
+}
+
+function fmtEventTime(dtStr) {
+  const d = new Date(dtStr);
+  let h = d.getHours(), m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}${m ? ':' + String(m).padStart(2, '0') : ''} ${ampm}`;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderCalEvents(events) {
+  const calEl = document.getElementById('calendarContent');
+  let html = '';
+
+  if (events.length === 0) {
+    html = '<div class="cal-empty">No events after 4 PM</div>';
+  } else {
+    for (const ev of events) {
+      const startDT = ev.start.dateTime;
+      const endDT = ev.end.dateTime;
+      let timeStr = startDT ? fmtEventTime(startDT) : 'All day';
+      if (startDT && endDT) timeStr += ` – ${fmtEventTime(endDT)}`;
+
+      html += `<div class="cal-event">
+        <div class="cal-event-time">${timeStr}</div>
+        <div class="cal-event-title">${escapeHtml(ev.summary || 'Untitled')}</div>
+        ${ev.location ? `<div class="cal-event-loc">📍 ${escapeHtml(ev.location)}</div>` : ''}
+      </div>`;
+    }
+  }
+
+  html += '<div class="cal-footer"><button class="gcal-signout-btn" onclick="signOutGoogle()">Sign out of Google</button></div>';
+  calEl.innerHTML = html;
+}
+
+// ============================
 // LOAD EVERYTHING
 // ============================
 function loadAll() {
   displayDateAndDay();
   loadWeather();
   loadLunch();
+  loadGCalSection();
   document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'})}`;
 }
 

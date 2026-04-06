@@ -34,6 +34,51 @@
     margin-bottom: 20px;
   }
 
+  .date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .nav-btn {
+    border: none;
+    background: white;
+    color: var(--purple);
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nav-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  .nav-btn:active,
+  .today-btn:active {
+    opacity: 0.8;
+  }
+
+  .today-btn {
+    border: none;
+    background: #e8e0f0;
+    color: var(--purple);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .date {
     font-size: 1.6rem;
     font-weight: 700;
@@ -235,6 +280,11 @@
 <body>
 
 <div class="header">
+  <div class="date-nav">
+    <button class="nav-btn" onclick="changeDate(-1)" aria-label="Previous day">‹</button>
+    <button class="today-btn" onclick="goToToday()">Today</button>
+    <button class="nav-btn" onclick="changeDate(1)" aria-label="Next day">›</button>
+  </div>
   <div class="date" id="todayDate">Loading...</div>
   <div class="program-day" id="programDay">...</div>
   <div class="day-cycle" id="dayCycle"></div>
@@ -323,10 +373,21 @@ const SCHOOL_YEAR_END   = new Date(2026, 4, 29); // May 29, 2026
 // Anchor: April 6, 2026 = Day 5
 const ANCHOR_DATE = new Date(2026, 3, 6);
 const ANCHOR_DAY  = 5;
+let selectedDate = startOfDay(new Date());
 
 // ============================
 // DATE HELPERS
 // ============================
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addDays(d, days) {
+  const next = new Date(d);
+  next.setDate(next.getDate() + days);
+  return startOfDay(next);
+}
+
 function toDateStr(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -395,28 +456,28 @@ function formatDate(d) {
 // DISPLAY DATE & PROGRAM DAY
 // ============================
 function displayDateAndDay() {
-  const today = new Date();
-  document.getElementById('todayDate').textContent = formatDate(today);
+  updateNavButtons();
+  document.getElementById('todayDate').textContent = formatDate(selectedDate);
 
-  const dayNum = getProgramDay(today);
+  const dayNum = getProgramDay(selectedDate);
   const pdEl = document.getElementById('programDay');
   const cycleEl = document.getElementById('dayCycle');
 
   if (dayNum === null) {
     // Check if it's a weekend or no-school day
-    if (!isWeekday(today)) {
+    if (!isWeekday(selectedDate)) {
       pdEl.textContent = 'Weekend!';
       pdEl.className = 'program-day no-school';
       // Show what the NEXT school day will be
-      showNextSchoolDay(cycleEl, today);
-    } else if (today < SCHOOL_YEAR_START || today > SCHOOL_YEAR_END) {
+      showNextSchoolDay(cycleEl, selectedDate);
+    } else if (selectedDate < SCHOOL_YEAR_START || selectedDate > SCHOOL_YEAR_END) {
       pdEl.textContent = 'No School';
       pdEl.className = 'program-day no-school';
       cycleEl.innerHTML = '';
     } else {
-      pdEl.textContent = 'No School Today';
+      pdEl.textContent = 'No School';
       pdEl.className = 'program-day no-school';
-      showNextSchoolDay(cycleEl, today);
+      showNextSchoolDay(cycleEl, selectedDate);
     }
   } else {
     pdEl.textContent = `Day ${dayNum}`;
@@ -444,6 +505,13 @@ function showNextSchoolDay(el, fromDate) {
   el.innerHTML = '';
 }
 
+function updateNavButtons() {
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  document.querySelector('[onclick="changeDate(-1)"]').disabled = toDateStr(selectedDate) === toDateStr(today);
+  document.querySelector('[onclick="changeDate(1)"]').disabled = toDateStr(selectedDate) === toDateStr(tomorrow);
+}
+
 // ============================
 // WEATHER (Open-Meteo — free, no key needed)
 // ============================
@@ -467,10 +535,15 @@ async function loadWeather() {
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation&temperature_unit=fahrenheit&timezone=America/Chicago&forecast_days=2`;
 
   try {
+    ['8', '12', '16'].forEach((id) => {
+      document.getElementById(`temp${id}`).textContent = '--°';
+      document.getElementById(`temp${id}`).classList.add('loading');
+      document.getElementById(`feels${id}`).textContent = 'Feels --°';
+    });
+
     const data = await fetchJSON(url);
 
-    const today = new Date();
-    const todayStr = toDateStr(today);
+    const targetStr = toDateStr(selectedDate);
 
     const hours = data.hourly.time;
     const temps = data.hourly.temperature_2m;
@@ -483,7 +556,7 @@ async function loadWeather() {
     const ids = ['8', '12', '16'];
 
     targetHours.forEach((h, i) => {
-      const timeStr = `${todayStr}T${String(h).padStart(2,'0')}:00`;
+      const timeStr = `${targetStr}T${String(h).padStart(2,'0')}:00`;
       const idx = hours.indexOf(timeStr);
       if (idx !== -1) {
         const t = Math.round(temps[idx]);
@@ -498,7 +571,7 @@ async function loadWeather() {
     let maxRain = 0;
     let firstRainHour = null;
     for (let h = 6; h <= 22; h++) {
-      const timeStr = `${todayStr}T${String(h).padStart(2,'0')}:00`;
+      const timeStr = `${targetStr}T${String(h).padStart(2,'0')}:00`;
       const idx = hours.indexOf(timeStr);
       if (idx !== -1) {
         if (rainProb[idx] > maxRain) maxRain = rainProb[idx];
@@ -509,8 +582,9 @@ async function loadWeather() {
     }
 
     const rainEl = document.getElementById('rainText');
+    const dateLabel = toDateStr(selectedDate) === toDateStr(new Date()) ? 'today' : 'that day';
     if (maxRain < 10) {
-      rainEl.textContent = `${maxRain}% chance of rain — Looking dry today!`;
+      rainEl.textContent = `${maxRain}% chance of rain — Looking dry ${dateLabel}!`;
       rainEl.classList.remove('loading');
     } else if (firstRainHour !== null) {
       const ampm = firstRainHour >= 12 ? 'pm' : 'am';
@@ -518,7 +592,7 @@ async function loadWeather() {
       rainEl.innerHTML = `<span class="rain-chance-high">${maxRain}% chance of rain</span> — possible starting around ${hr12}${ampm}`;
       rainEl.classList.remove('loading');
     } else {
-      rainEl.textContent = `${maxRain}% chance of rain today`;
+      rainEl.textContent = `${maxRain}% chance of rain ${dateLabel}`;
       rainEl.classList.remove('loading');
     }
 
@@ -576,12 +650,12 @@ const LUNCH_DB = {
 };
 
 function loadLunch() {
-  const todayStr = toDateStr(new Date());
+  const todayStr = toDateStr(selectedDate);
   const menuEl = document.getElementById('lunchMenu');
   const entry = LUNCH_DB[todayStr];
 
   if (!entry) {
-    menuEl.innerHTML = '<div class="loading">No lunch data for today. <a href="https://johnston.nutrislice.com/menu/wallace-elementary/lunch" target="_blank" style="color:var(--purple)">View on Nutrislice</a></div>';
+    menuEl.innerHTML = '<div class="loading">No lunch data for this date. <a href="https://johnston.nutrislice.com/menu/wallace-elementary/lunch" target="_blank" style="color:var(--purple)">View on Nutrislice</a></div>';
     return;
   }
 
@@ -621,6 +695,20 @@ function loadAll() {
   loadWeather();
   loadLunch();
   document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'})}`;
+}
+
+function changeDate(offset) {
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  const nextDate = addDays(selectedDate, offset);
+  if (nextDate < today || nextDate > tomorrow) return;
+  selectedDate = nextDate;
+  loadAll();
+}
+
+function goToToday() {
+  selectedDate = startOfDay(new Date());
+  loadAll();
 }
 
 // Start on page load

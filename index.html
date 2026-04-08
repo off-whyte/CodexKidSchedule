@@ -814,8 +814,35 @@ function loadGCalSection() {
     fetchCalendarEvents();
   } else {
     gcalToken = null;
-    renderGCalSignIn();
+    // Try to get a new token silently (no button click needed)
+    trySilentSignIn();
   }
+}
+
+function trySilentSignIn() {
+  if (typeof google === 'undefined') {
+    renderGCalSignIn();
+    return;
+  }
+  document.getElementById('calendarContent').innerHTML = '<div class="loading">Loading events…</div>';
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    prompt: '',
+    callback(resp) {
+      if (resp.error) {
+        // Silent refresh failed — user needs to click
+        renderGCalSignIn();
+        return;
+      }
+      gcalToken = resp.access_token;
+      gcalTokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+      localStorage.setItem('gcal_token', gcalToken);
+      localStorage.setItem('gcal_expiry', String(gcalTokenExpiry));
+      fetchCalendarEvents();
+    },
+  });
+  client.requestAccessToken({ prompt: '' });
 }
 
 function renderGCalSignIn() {
